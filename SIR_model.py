@@ -1,4 +1,5 @@
 import random as rd
+from concurrent.futures import ThreadPoolExecutor
 
 class Agent:
 	def __init__(self, pos=(0,0), b_shape=(10,10), sick=False, moving_range=1):
@@ -71,12 +72,21 @@ class Controller:
 			agent = Agent(**agent_properties)
 			self.agents.append(agent)
 
+	def time_step(self, time_step):
+		self.agents_move()
+		self.agents_recover()
+		self.agents_spread_disease()
+
+		with open('Disease_spread.csv', 'a') as file:
+			file.write(f'{time_step},{self.susceptibles},{self.sick_agents},{self.recovered}\n')
+
 	def agents_move(self):
-		for agent in self.agents:
-			agent.move()
+		with ThreadPoolExecutor() as executor:
+			for agent in self.agents:
+				executor.submit( agent.move() )
 
 	def agents_spread_disease(self):
-		for agent in self.agents:
+		def agent_spreads_desease(agent):
 			if agent.is_sick:
 				cx,cy = agent.pos
 				for agent in self.agents:
@@ -86,32 +96,33 @@ class Controller:
 						self.susceptibles-=1
 						self.sick_agents+=1
 
+		with ThreadPoolExecutor() as executor:
+			for agent in self.agents:
+				executor.submit( agent_spreads_desease(agent) )
+
 	def agents_recover(self):
-		for agent in self.agents:
+		def agent_recovers(agent):
 			if agent.is_sick and rd.random()>self.gamma:
 				agent.is_sick=False
 				agent.recovered=True
 				self.sick_agents-=1
 				self.recovered+=1
-
-	def time_step(self, time_step):
-		self.agents_move()
-		self.agents_spread_disease()
-		self.agents_recover()
-
-		with open('Disease_spread.csv', 'a') as file:
-			file.write(f'{time_step},{self.susceptibles},{self.sick_agents},{self.recovered}\n')
+		
+		with ThreadPoolExecutor() as executor:
+			for agent in self.agents:
+				executor.submit( agent_recovers(agent) )
 
 
 if __name__ == "__main__":
 	sim_properties = {
-		'n_agents':10,
-		'sick_agents':1,
-		'b_shape':(10,10),
-		'beta': .6,
-		'gamma': .6,
-		'disease_spread_distance':1,
-		'time_steps':5
+		'n_agents':250,
+		'sick_agents':50,
+		'b_shape':(50,50),
+		'beta': .75,
+		'gamma': .75,
+		'disease_spread_distance':5,
+		'time_steps':15
 	}
+
 	contoller = Controller(**sim_properties) 
 	contoller.start_sim()
