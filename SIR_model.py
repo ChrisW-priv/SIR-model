@@ -11,9 +11,10 @@ class Agent:
         self.susceptible = not sick
         self.is_sick = sick
         self.moving_range = moving_range
+        self.last_change = 0
 
     def __repr__(self):
-        return f"({round(self.pos_x,5)}, {round(self.pos_y,5)})"
+        return f"({int(self.pos_x)}, {int(self.pos_y)})"
 
     def move(self):
         # change position - if new position outside plane - do not let it
@@ -83,9 +84,9 @@ class Simulator:
             create_agent(sick=False)
 
     def time_step(self, time_step):
-        self.agents_spread_disease()
+        self.agents_spread_disease(time_step)
         self.agent_dies_or_recovers()
-        # self.agents_move()
+        self.agents_move()
 
         # tract the changes and store them in the file
         with open(self.file_to_store_data, 'a') as file:
@@ -113,7 +114,7 @@ class Simulator:
             for agent in self.sick_agents:
                 executor.submit(agent.move())
 
-    def agents_spread_disease(self):
+    def agents_spread_disease(self, current_step):
         def agent_spreads_disease(sick_agent):
             x1 = sick_agent.pos_x
             y1 = sick_agent.pos_y
@@ -122,13 +123,14 @@ class Simulator:
                 y2 = agent.pos_y
 
                 # calculates distance and determines if gets infected or not
-                if ((x2 - x1) ** 2 + (y2 - y1) ** 2) <= self.disease_spread_distance**2 and rd.random() < self.infection_rate:
+                if sick_agent.last_change != current_step and ((x2 - x1) ** 2 + (y2 - y1) ** 2) <= self.disease_spread_distance**2 and rd.random() < self.infection_rate:
+                    agent.last_change = current_step
+                    self.susceptible_agents.remove(agent)
+                    self.sick_agents.append(agent)
                     agent.susceptible = False
                     agent.is_sick = True
                     self.sick_agents_count += 1
                     self.susceptible_agents_count -= 1
-                    self.susceptible_agents.remove(agent)
-                    self.sick_agents.append(agent)
 
         with ThreadPoolExecutor() as executor:
             for sick_agent in self.sick_agents:
@@ -172,7 +174,7 @@ if __name__ == '__main__':
         'infection_rate': .75,
         'recovery_rate': .25,
         'death_risk': .01,
-        'disease_spread_distance': 50,
+        'disease_spread_distance': 8,
         'moving_range': 100,
         'time_steps': 15
     }
