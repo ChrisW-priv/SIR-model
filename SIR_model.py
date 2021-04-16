@@ -1,4 +1,5 @@
-import random as rd
+from random import random
+from array import array
 from concurrent.futures import ThreadPoolExecutor
 
 
@@ -18,8 +19,8 @@ class Agent:
 
     def move(self):
         # change position - if new position outside plane - do not let it
-        self.pos_x += (rd.random()-0.5) * 2 * self.moving_range
-        self.pos_y += (rd.random()-0.5) * 2 * self.moving_range
+        self.pos_x += (random()-0.5) * 2 * self.moving_range
+        self.pos_y += (random()-0.5) * 2 * self.moving_range
         self.pos_x = max(0, min(self.pos_x, self.plane_shape[0]))
         self.pos_y = max(0, min(self.pos_y, self.plane_shape[1]))
 
@@ -41,14 +42,16 @@ class Simulator:
         self.moving_range = moving_range
         self.time_steps = time_steps
 
-        self.susceptible_agents = []
         self.sick_agents = []
+        self.neighbours_by_coordinate = array('h', [-1, 0, 1])
+
+        self.susceptible_agents_grid = {}
 
         # we initialise tracking changes in a file:
         self.file_to_store_data = f'Disease spread - Sim nr.{sim_number}.csv'
         self.sim_number = sim_number
         with open(self.file_to_store_data, 'w') as new:
-            new.write('Time_step,susceptible,Infected,Recovered,Dead\n')
+            new.write('Time_step,Susceptible,Infected,Recovered,Dead\n')
             new.write(f'0,{self.susceptible_agents_count},{self.sick_agents_count},0,0,0\n')
 
     def __repr__(self):
@@ -58,16 +61,44 @@ class Simulator:
             f'disease spread distance={self.disease_spread_distance}\nmoving range={self.moving_range}\n' \
             f'time steps={self.time_steps}'
 
-    def start_sim(self):
+    def run_sim(self):
         self.create_agents()
         for time_step in range(1, self.time_steps+1):
             self.time_step(time_step)
 
+    def run_sim_with_visualisation(self):
+        import matplotlib.pyplot as plt
+
+        def vis_time_step(time_step):
+            with ThreadPoolExecutor() as executor:
+                # plot all the susceptible agents
+                for key in self.susceptible_agents_grid:
+                    for agent in self.susceptible_agents_grid.get(key):
+                        x = agent.pos_x
+                        y = agent.pos_y
+                        executor.submit(plt.scatter(x, y, c='green', edgecolors='none', s=30))
+
+                # plot all the sick agents
+                for a in self.sick_agents:
+                    executor.submit(plt.scatter(a.pos_x, a.pos_y, c='red', edgecolors='none', s=30))
+
+            offset = 3
+            plt.xlim([0-offset, self.plane_shape[0] + offset])
+            plt.ylim([0-offset, self.plane_shape[1] + offset])
+            plt.savefig(f"./images/state{time_step}.png")
+            plt.close('all')
+
+        self.create_agents()
+        vis_time_step(0)
+        for time_step in range(1, self.time_steps + 1):
+            self.time_step(time_step)
+            vis_time_step(time_step)
+
     def create_agents(self):
         def create_agent(sick=False):
             agent_properties = {
-                'pos_x': (rd.random() * self.plane_shape[0]),
-                'pos_y': (rd.random() * self.plane_shape[1]),
+                'pos_x': (random() * self.plane_shape[0]),
+                'pos_y': (random() * self.plane_shape[1]),
                 'plane_shape': self.plane_shape,
                 'sick': sick,
                 'moving_range': self.moving_range
@@ -76,7 +107,13 @@ class Simulator:
             if sick:
                 self.sick_agents.append(agent)
             else:
-                self.susceptible_agents.append(agent)
+                x = int(agent.pos_x//self.disease_spread_distance)
+                y = int(agent.pos_y//self.disease_spread_distance)
+                block = self.susceptible_agents_grid.get((x, y))
+                if block:
+                    block.append(agent)
+                else:
+                    self.susceptible_agents_grid[(x, y)] = [agent]
 
         for _ in range(self.sick_agents_count):
             create_agent(sick=True)
@@ -94,91 +131,91 @@ class Simulator:
 
     def agent_dies_or_recovers(self):
         def decide_on_agent_dies(agent):
-            if rd.random() < self.death_risk:
+            if random() < self.death_risk:
                 self.sick_agents.remove(agent)
                 self.death_count += 1
                 self.sick_agents_count -= 1
-            elif rd.random() < self.recovery_rate:
+            elif random() < self.recovery_rate:
                 self.sick_agents.remove(agent)
                 self.recovered_count += 1
                 self.sick_agents_count -= 1
 
         with ThreadPoolExecutor() as executor:
-            for agent in self.sick_agents:
-                executor.submit( decide_on_agent_dies(agent) )
+            for sick_agent in self.sick_agents:
+                executor.submit(decide_on_agent_dies(sick_agent))
 
     def agents_move(self):
+        def move_agent_on_block_grid(agent):
+            grid_x = int(agent.pos_x // self.disease_spread_distance)
+            grid_y = int(agent.pos_y // self.disease_spread_distance)
+            agent.move()
+            n_grid_x = int(agent.pos_x // self.disease_spread_distance)
+            n_grid_y = int(agent.pos_y // self.disease_spread_distance)
+
+            if grid_x != n_grid_x or grid_y != n_grid_y:
+                self.susceptible_agents_grid.get((grid_x, grid_y)).remove(agent)
+                block = self.susceptible_agents_grid.get((n_grid_x, n_grid_y))
+                if block:
+                    block.append(agent)
+                else:
+                    self.susceptible_agents_grid[(n_grid_x, n_grid_y)] = [agent]
+
         with ThreadPoolExecutor() as executor:
-            for agent in self.susceptible_agents:
-                executor.submit(agent.move())
-            for agent in self.sick_agents:
-                executor.submit(agent.move())
+            # susceptible agents move
+            for susceptible_agent in [agent for key in self.susceptible_agents_grid for agent in self.susceptible_agents_grid.get(key)]:
+                executor.submit(move_agent_on_block_grid(susceptible_agent))
+
+            # sick agents move
+            for sick_agent in self.sick_agents:
+                executor.submit(sick_agent.move())
 
     def agents_spread_disease(self, current_step):
         def agent_spreads_disease(sick_agent):
             x1 = sick_agent.pos_x
             y1 = sick_agent.pos_y
-            for agent in self.susceptible_agents:
-                x2 = agent.pos_x
-                y2 = agent.pos_y
+            sick_grid_x = int(x1 // self.disease_spread_distance)
+            sick_grid_y = int(y1 // self.disease_spread_distance)
 
-                # calculates distance and determines if gets infected or not
-                if sick_agent.last_change != current_step and ((x2 - x1) ** 2 + (y2 - y1) ** 2) <= self.disease_spread_distance**2 and rd.random() < self.infection_rate:
-                    agent.last_change = current_step
-                    self.susceptible_agents.remove(agent)
-                    self.sick_agents.append(agent)
-                    agent.susceptible = False
-                    agent.is_sick = True
-                    self.sick_agents_count += 1
-                    self.susceptible_agents_count -= 1
+            for cell in self.get_all_cells_next_to_cell_block(sick_grid_x, sick_grid_y):
+                for susceptible_agent in cell:
+                    x2 = susceptible_agent.pos_x
+                    y2 = susceptible_agent.pos_y
+
+                    # calculates distance and determines if gets infected or not
+                    if ((x2 - x1)**2 + (y2 - y1)**2)**0.5 <= self.disease_spread_distance and random() <= self.infection_rate:
+                        susceptible_agent.last_change = current_step
+                        cell.remove(susceptible_agent)
+                        self.sick_agents.append(susceptible_agent)
+                        susceptible_agent.is_sick = True
+                        susceptible_agent.susceptible = False
+                        self.sick_agents_count += 1
+                        self.susceptible_agents_count -= 1
 
         with ThreadPoolExecutor() as executor:
             for sick_agent in self.sick_agents:
-                executor.submit( agent_spreads_disease(sick_agent) )
+                if sick_agent.last_change != current_step:
+                    executor.submit(agent_spreads_disease(sick_agent))
 
-    def run_sim_with_visualisation(self):
-        import matplotlib.pyplot as plt
-
-        def vis_time_step(time_step):
-            # Create data
-            susceptible_coordinates = [(a.pos_x, a.pos_y) for a in self.susceptible_agents]
-            sick_coordinates = [(a.pos_x, a.pos_y) for a in self.sick_agents]
-
-            # Create plot
-            fig = plt.figure()
-            ax = fig.add_subplot(1, 1, 1)
-
-            for data in susceptible_coordinates:
-                x, y = data
-                ax.scatter(x, y, alpha=0.8, c='green', edgecolors='none', s=30)
-
-            for data in sick_coordinates:
-                x, y = data
-                ax.scatter(x, y, alpha=0.8, c='red', edgecolors='none', s=30)
-
-            plt.savefig(f"./images/state{time_step}.png")
-            plt.close(fig)
-
-        self.create_agents()
-        for time_step in range(self.time_steps):
-            vis_time_step(time_step)
-            self.time_step(time_step+1)
-        vis_time_step(time_step)
+    def get_all_cells_next_to_cell_block(self, grid_x, grid_y):
+        for i in self.neighbours_by_coordinate:
+            for j in self.neighbours_by_coordinate:
+                new_x = grid_x + i
+                new_y = grid_y + j
+                yield self.susceptible_agents_grid.get((new_x, new_y), [])
 
 
 if __name__ == '__main__':
     PARAMS = {
-        'n_agents': 1000,
+        'n_agents': 100,
         'plane_shape': (500, 500),
         'sick_agents': 10,
-        'infection_rate': .75,
-        'recovery_rate': .25,
+        'infection_rate': 1,
+        'recovery_rate': 1,
         'death_risk': .01,
         'disease_spread_distance': 8,
         'moving_range': 100,
-        'time_steps': 15
+        'time_steps': 10
     }
-    rd.seed(256)
 
     print('Simulation Initialised!')
     simulator = Simulator(**PARAMS)
