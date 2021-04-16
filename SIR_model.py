@@ -1,6 +1,21 @@
 from random import random
 from array import array
 from concurrent.futures import ThreadPoolExecutor
+from time import time
+
+
+def timer(func):
+    def wrapper(*args, **kwargs):
+        start = time()
+        func(*args, **kwargs)
+        end = time()
+
+        with open('performance.txt', 'a') as file:
+            file.write(f'{func.__name__}\t{end-start}\n')
+        if func.__name__ == 'main':
+            print(f'It took: {end-start} to execute')
+
+    return wrapper
 
 
 class Agent:
@@ -94,6 +109,7 @@ class Simulator:
             self.time_step(time_step)
             vis_time_step(time_step)
 
+    @timer
     def create_agents(self):
         def create_agent(sick=False):
             agent_properties = {
@@ -120,6 +136,7 @@ class Simulator:
         for _ in range(self.susceptible_agents_count):
             create_agent(sick=False)
 
+    @timer
     def time_step(self, time_step):
         self.agents_spread_disease(time_step)
         self.agent_dies_or_recovers()
@@ -129,6 +146,7 @@ class Simulator:
         with open(self.file_to_store_data, 'a') as file:
             file.write(f'{time_step},{self.susceptible_agents_count},{self.sick_agents_count},{self.recovered_count},{self.death_count}\n')
 
+    @timer
     def agent_dies_or_recovers(self):
         def decide_on_agent_dies(agent):
             if random() < self.death_risk:
@@ -144,6 +162,7 @@ class Simulator:
             for sick_agent in self.sick_agents:
                 executor.submit(decide_on_agent_dies(sick_agent))
 
+    @timer
     def agents_move(self):
         def move_agent_on_block_grid(agent):
             grid_x = int(agent.pos_x // self.disease_spread_distance)
@@ -169,6 +188,7 @@ class Simulator:
             for sick_agent in self.sick_agents:
                 executor.submit(sick_agent.move())
 
+    @timer
     def agents_spread_disease(self, current_step):
         def agent_spreads_disease(sick_agent):
             x1 = sick_agent.pos_x
@@ -217,7 +237,14 @@ if __name__ == '__main__':
         'time_steps': 10
     }
 
+    with open('performance.txt', 'w') as new:
+        pass
+
+    @timer
+    def main():
+        simulator = Simulator(**PARAMS)
+        simulator.run_sim()
+
     print('Simulation Initialised!')
-    simulator = Simulator(**PARAMS)
-    simulator.run_sim_with_visualisation()
+    main()
     print('Simulation ended!')
