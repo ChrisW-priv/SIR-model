@@ -7,13 +7,15 @@ from time import time
 def timer(func):
     def wrapper(*args, **kwargs):
         start = time()
-        func(*args, **kwargs)
+        val = func(*args, **kwargs)
         end = time()
 
         with open('performance.txt', 'a') as file:
             file.write(f'{func.__name__}\t{end-start}\n')
         if func.__name__ == 'main':
             print(f'It took: {end-start} to execute')
+
+        return val
 
     return wrapper
 
@@ -79,7 +81,9 @@ class Simulator:
     def run_sim(self):
         self.create_agents()
         for time_step in range(1, self.time_steps+1):
-            self.time_step(time_step)
+            stop = self.time_step(time_step)
+            if stop:
+                return True
 
     def run_sim_with_visualisation(self):
         import matplotlib.pyplot as plt
@@ -139,15 +143,19 @@ class Simulator:
     @timer
     def time_step(self, time_step):
         self.agents_spread_disease(time_step)
-        self.agent_dies_or_recovers()
+        self.agent_dies_or_recovers(time_step)
         self.agents_move()
+
+        if self.sick_agents_count == 0:
+            print(f'function stropped at time step: {time_step}, due to lack of sick agents')
+            return True
 
         # tract the changes and store them in the file
         with open(self.file_to_store_data, 'a') as file:
             file.write(f'{time_step},{self.susceptible_agents_count},{self.sick_agents_count},{self.recovered_count},{self.death_count}\n')
 
     @timer
-    def agent_dies_or_recovers(self):
+    def agent_dies_or_recovers(self, time_step):
         def decide_on_agent_dies(agent):
             if random() < self.death_risk:
                 self.sick_agents.remove(agent)
@@ -160,7 +168,8 @@ class Simulator:
 
         with ThreadPoolExecutor() as executor:
             for sick_agent in self.sick_agents:
-                executor.submit(decide_on_agent_dies(sick_agent))
+                if sick_agent.last_change != time_step:
+                    executor.submit(decide_on_agent_dies(sick_agent))
 
     @timer
     def agents_move(self):
@@ -202,7 +211,7 @@ class Simulator:
                     y2 = susceptible_agent.pos_y
 
                     # calculates distance and determines if gets infected or not
-                    if ((x2 - x1)**2 + (y2 - y1)**2)**0.5 <= self.disease_spread_distance and random() <= self.infection_rate:
+                    if ((x2 - x1)**2 + (y2 - y1)**2) <= self.disease_spread_distance**2 and random() <= self.infection_rate:
                         susceptible_agent.last_change = current_step
                         cell.remove(susceptible_agent)
                         self.sick_agents.append(susceptible_agent)
