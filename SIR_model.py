@@ -127,8 +127,8 @@ class Simulator:
             if sick:
                 self.sick_agents.append(agent)
             else:
-                x = int(agent.pos_x//self.disease_spread_distance)
-                y = int(agent.pos_y//self.disease_spread_distance)
+                x = agent.pos_x//self.disease_spread_distance
+                y = agent.pos_y//self.disease_spread_distance
                 block = self.susceptible_agents_grid.get((x, y))
                 if block:
                     block.append(agent)
@@ -174,11 +174,11 @@ class Simulator:
     @timer
     def agents_move(self):
         def move_agent_on_block_grid(agent):
-            grid_x = int(agent.pos_x // self.disease_spread_distance)
-            grid_y = int(agent.pos_y // self.disease_spread_distance)
+            grid_x = agent.pos_x // self.disease_spread_distance
+            grid_y = agent.pos_y // self.disease_spread_distance
             agent.move()
-            n_grid_x = int(agent.pos_x // self.disease_spread_distance)
-            n_grid_y = int(agent.pos_y // self.disease_spread_distance)
+            n_grid_x = agent.pos_x // self.disease_spread_distance
+            n_grid_y = agent.pos_y // self.disease_spread_distance
 
             if grid_x != n_grid_x or grid_y != n_grid_y:
                 self.susceptible_agents_grid.get((grid_x, grid_y)).remove(agent)
@@ -202,8 +202,8 @@ class Simulator:
         def agent_spreads_disease(sick_agent):
             x1 = sick_agent.pos_x
             y1 = sick_agent.pos_y
-            sick_grid_x = int(x1 // self.disease_spread_distance)
-            sick_grid_y = int(y1 // self.disease_spread_distance)
+            sick_grid_x = x1 // self.disease_spread_distance
+            sick_grid_y = y1 // self.disease_spread_distance
 
             for cell in self.get_all_cells_next_to_cell_block(sick_grid_x, sick_grid_y):
                 for susceptible_agent in cell:
