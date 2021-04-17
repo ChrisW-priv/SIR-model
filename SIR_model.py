@@ -1,4 +1,4 @@
-from random import random
+import random as rd
 from array import array
 from concurrent.futures import ThreadPoolExecutor
 from time import time
@@ -36,8 +36,8 @@ class Agent:
 
     def move(self):
         # change position - if new position outside plane - do not let it
-        self.pos_x += (random()-0.5) * 2 * self.moving_range
-        self.pos_y += (random()-0.5) * 2 * self.moving_range
+        self.pos_x += (rd.random()-0.5) * 2 * self.moving_range
+        self.pos_y += (rd.random()-0.5) * 2 * self.moving_range
         self.pos_x = max(0, min(self.pos_x, self.plane_shape[0]))
         self.pos_y = max(0, min(self.pos_y, self.plane_shape[1]))
 
@@ -117,8 +117,8 @@ class Simulator:
     def create_agents(self):
         def create_agent(sick=False):
             agent_properties = {
-                'pos_x': (random() * self.plane_shape[0]),
-                'pos_y': (random() * self.plane_shape[1]),
+                'pos_x': (rd.random() * self.plane_shape[0]),
+                'pos_y': (rd.random() * self.plane_shape[1]),
                 'plane_shape': self.plane_shape,
                 'sick': sick,
                 'moving_range': self.moving_range
@@ -157,11 +157,11 @@ class Simulator:
     @timer
     def agent_dies_or_recovers(self, time_step):
         def decide_on_agent_dies(agent):
-            if random() < self.death_risk:
+            if rd.random() < self.death_risk:
                 self.sick_agents.remove(agent)
                 self.death_count += 1
                 self.sick_agents_count -= 1
-            elif random() < self.recovery_rate:
+            elif rd.random() < self.recovery_rate:
                 self.sick_agents.remove(agent)
                 self.recovered_count += 1
                 self.sick_agents_count -= 1
@@ -211,7 +211,7 @@ class Simulator:
                     y2 = susceptible_agent.pos_y
 
                     # calculates distance and determines if gets infected or not
-                    if ((x2 - x1)**2 + (y2 - y1)**2) <= self.disease_spread_distance**2 and random() <= self.infection_rate:
+                    if ((x2 - x1)**2 + (y2 - y1)**2) <= self.disease_spread_distance**2 and rd.random() <= self.infection_rate:
                         susceptible_agent.last_change = current_step
                         cell.remove(susceptible_agent)
                         self.sick_agents.append(susceptible_agent)
@@ -238,17 +238,18 @@ if __name__ == '__main__':
         'n_agents': 100000,
         'plane_shape': (50000, 50000),
         'sick_agents': 10000,
-        'infection_rate': 1,
-        'recovery_rate': 1,
+        'infection_rate': 0.5,
+        'recovery_rate': 0.5,
         'death_risk': .01,
-        'disease_spread_distance': 8,
-        'moving_range': 100,
+        'disease_spread_distance': 10,
+        'moving_range': 50,
         'time_steps': 25
     }
 
     with open('performance.txt', 'w') as new:
         pass
 
+    rd.seed(256)
     @timer
     def main():
         simulator = Simulator(**PARAMS)
