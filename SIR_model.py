@@ -116,14 +116,9 @@ class Simulator:
     @timer
     def create_agents(self):
         def create_agent(sick=False):
-            agent_properties = {
-                'pos_x': (rd.random() * self.plane_shape[0]),
-                'pos_y': (rd.random() * self.plane_shape[1]),
-                'plane_shape': self.plane_shape,
-                'sick': sick,
-                'moving_range': self.moving_range
-            }
-            agent = Agent(**agent_properties)
+            pos_x = rd.random() * self.plane_shape[0]
+            pos_y = rd.random() * self.plane_shape[1]
+            agent = Agent(pos_x, pos_y, self.plane_shape, sick, self.moving_range)
             if sick:
                 self.sick_agents.append(agent)
             else:
