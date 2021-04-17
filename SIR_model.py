@@ -101,7 +101,7 @@ class Simulator:
                 for a in self.sick_agents:
                     executor.submit(plt.scatter(a.pos_x, a.pos_y, c='red', edgecolors='none', s=30))
 
-            offset = 3
+            offset = 10
             plt.xlim([0-offset, self.plane_shape[0] + offset])
             plt.ylim([0-offset, self.plane_shape[1] + offset])
             plt.savefig(f"./images/state{time_step}.png")
@@ -110,7 +110,7 @@ class Simulator:
         self.create_agents()
         vis_time_step(0)
         for time_step in range(1, self.time_steps + 1):
-            self.time_step(time_step)
+            self.time_step(time_step, True)
             vis_time_step(time_step)
 
     @timer
@@ -136,10 +136,13 @@ class Simulator:
             create_agent(sick=False)
 
     @timer
-    def time_step(self, time_step):
+    def time_step(self, time_step, vis=False):
         self.agents_spread_disease(time_step)
         self.agent_dies_or_recovers(time_step)
-        self.agents_move()
+
+        # if we want to visualise changes we do not want agents to move
+        if not vis:
+            self.agents_move()
 
         if self.sick_agents_count == 0:
             print(f'function stropped at time step: {time_step}, due to lack of sick agents')
