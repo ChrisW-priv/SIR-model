@@ -235,15 +235,15 @@ class Simulator:
 
 if __name__ == '__main__':
     PARAMS = {
-        'n_agents': 100,
-        'plane_shape': (500, 500),
-        'sick_agents': 10,
+        'n_agents': 100000,
+        'plane_shape': (50000, 50000),
+        'sick_agents': 10000,
         'infection_rate': 1,
         'recovery_rate': 1,
         'death_risk': .01,
         'disease_spread_distance': 8,
         'moving_range': 100,
-        'time_steps': 10
+        'time_steps': 25
     }
 
     with open('performance.txt', 'w') as new:
