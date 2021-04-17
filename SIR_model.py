@@ -150,6 +150,42 @@ class Simulator:
             file.write(f'{time_step},{self.susceptible_agents_count},{self.sick_agents_count},{self.recovered_count},{self.death_count}\n')
 
     @timer
+    def agents_spread_disease(self, current_step):
+        def agent_spreads_disease(sick_agent):
+            x1 = sick_agent.pos_x
+            y1 = sick_agent.pos_y
+            sick_grid_x = x1 // self.disease_spread_distance
+            sick_grid_y = y1 // self.disease_spread_distance
+
+            for cell in self.get_all_cells_next_to_cell_block(sick_grid_x, sick_grid_y):
+                for susceptible_agent in cell:
+                    x2 = susceptible_agent.pos_x
+                    y2 = susceptible_agent.pos_y
+
+                    # calculates distance and determines if gets infected or not
+                    if ((x2 - x1) ** 2 + (
+                            y2 - y1) ** 2) <= self.disease_spread_distance ** 2 and rd.random() <= self.infection_rate:
+                        susceptible_agent.last_change = current_step
+                        cell.remove(susceptible_agent)
+                        self.sick_agents.append(susceptible_agent)
+                        susceptible_agent.is_sick = True
+                        susceptible_agent.susceptible = False
+                        self.sick_agents_count += 1
+                        self.susceptible_agents_count -= 1
+
+        with ThreadPoolExecutor() as executor:
+            for sick_agent in self.sick_agents:
+                if sick_agent.last_change != current_step:
+                    executor.submit(agent_spreads_disease(sick_agent))
+
+    def get_all_cells_next_to_cell_block(self, grid_x, grid_y):
+        for i in self.neighbours_by_coordinate:
+            for j in self.neighbours_by_coordinate:
+                new_x = grid_x + i
+                new_y = grid_y + j
+                yield self.susceptible_agents_grid.get((new_x, new_y), [])
+
+    @timer
     def agent_dies_or_recovers(self, time_step):
         def decide_on_agent_dies(agent):
             if rd.random() < self.death_risk:
@@ -184,6 +220,7 @@ class Simulator:
                     self.susceptible_agents_grid[(n_grid_x, n_grid_y)] = [agent]
 
         with ThreadPoolExecutor() as executor:
+
             # susceptible agents move
             for susceptible_agent in [agent for key in self.susceptible_agents_grid for agent in self.susceptible_agents_grid.get(key)]:
                 executor.submit(move_agent_on_block_grid(susceptible_agent))
@@ -191,41 +228,6 @@ class Simulator:
             # sick agents move
             for sick_agent in self.sick_agents:
                 executor.submit(sick_agent.move())
-
-    @timer
-    def agents_spread_disease(self, current_step):
-        def agent_spreads_disease(sick_agent):
-            x1 = sick_agent.pos_x
-            y1 = sick_agent.pos_y
-            sick_grid_x = x1 // self.disease_spread_distance
-            sick_grid_y = y1 // self.disease_spread_distance
-
-            for cell in self.get_all_cells_next_to_cell_block(sick_grid_x, sick_grid_y):
-                for susceptible_agent in cell:
-                    x2 = susceptible_agent.pos_x
-                    y2 = susceptible_agent.pos_y
-
-                    # calculates distance and determines if gets infected or not
-                    if ((x2 - x1)**2 + (y2 - y1)**2) <= self.disease_spread_distance**2 and rd.random() <= self.infection_rate:
-                        susceptible_agent.last_change = current_step
-                        cell.remove(susceptible_agent)
-                        self.sick_agents.append(susceptible_agent)
-                        susceptible_agent.is_sick = True
-                        susceptible_agent.susceptible = False
-                        self.sick_agents_count += 1
-                        self.susceptible_agents_count -= 1
-
-        with ThreadPoolExecutor() as executor:
-            for sick_agent in self.sick_agents:
-                if sick_agent.last_change != current_step:
-                    executor.submit(agent_spreads_disease(sick_agent))
-
-    def get_all_cells_next_to_cell_block(self, grid_x, grid_y):
-        for i in self.neighbours_by_coordinate:
-            for j in self.neighbours_by_coordinate:
-                new_x = grid_x + i
-                new_y = grid_y + j
-                yield self.susceptible_agents_grid.get((new_x, new_y), [])
 
 
 if __name__ == '__main__':
