@@ -88,6 +88,7 @@ class Simulator:
     def run_sim_with_visualisation(self):
         import matplotlib.pyplot as plt
 
+        @timer
         def vis_time_step(time_step):
             with ThreadPoolExecutor() as executor:
                 # plot all the susceptible agents
@@ -110,8 +111,10 @@ class Simulator:
         self.create_agents()
         vis_time_step(0)
         for time_step in range(1, self.time_steps + 1):
-            self.time_step(time_step, True)
+            stop = self.time_step(time_step, True)
             vis_time_step(time_step)
+            if stop:
+                return True
 
     @timer
     def create_agents(self):
@@ -235,13 +238,13 @@ class Simulator:
 
 if __name__ == '__main__':
     PARAMS = {
-        'n_agents': 100000,
-        'plane_shape': (50000, 50000),
-        'sick_agents': 10000,
-        'infection_rate': 0.5,
-        'recovery_rate': 0.5,
-        'death_risk': .01,
-        'disease_spread_distance': 10,
+        'n_agents': 10000,
+        'plane_shape': (5000, 5000),
+        'sick_agents': 1000,
+        'infection_rate': 0.25,
+        'recovery_rate': 0,
+        'death_risk': 0.01,
+        'disease_spread_distance': 25,
         'moving_range': 50,
         'time_steps': 25
     }
@@ -253,7 +256,7 @@ if __name__ == '__main__':
     @timer
     def main():
         simulator = Simulator(**PARAMS)
-        simulator.run_sim()
+        simulator.run_sim_with_visualisation()
 
     print('Simulation Initialised!')
     main()
