@@ -1,4 +1,4 @@
-import random as rd
+from random import seed, random
 from array import array
 from concurrent.futures import ThreadPoolExecutor
 from time import time
@@ -36,8 +36,8 @@ class Agent:
 
     def move(self):
         # change position - if new position outside plane - do not let it
-        self.pos_x += (rd.random()-0.5) * 2 * self.moving_range
-        self.pos_y += (rd.random()-0.5) * 2 * self.moving_range
+        self.pos_x += (random()-0.5) * 2 * self.moving_range
+        self.pos_y += (random()-0.5) * 2 * self.moving_range
         self.pos_x = max(0, min(self.pos_x, self.plane_shape[0]))
         self.pos_y = max(0, min(self.pos_y, self.plane_shape[1]))
 
@@ -194,11 +194,11 @@ class Simulator:
     @timer
     def agent_dies_or_recovers(self, time_step):
         def decide_on_agent_dies(agent):
-            if rd.random() < self.death_risk:
+            if random() < self.death_risk:
                 self.sick_agents.remove(agent)
                 self.death_count += 1
                 self.sick_agents_count -= 1
-            elif rd.random() < self.recovery_rate:
+            elif random() < self.recovery_rate:
                 self.sick_agents.remove(agent)
                 self.recovered_count += 1
                 self.sick_agents_count -= 1
@@ -252,7 +252,7 @@ if __name__ == '__main__':
     with open('performance.txt', 'w') as new:
         pass
 
-    rd.seed(256)
+    seed(256)
     @timer
     def main():
         simulator = Simulator(**PARAMS)
